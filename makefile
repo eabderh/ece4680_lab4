@@ -53,17 +53,18 @@ t8 :
 t9 :
 
 
-cl : clo clt clsl cla
-	mkdir trash
+#cl : clo clt clsl cla
+#	rm -f core
+cl : clo
 	rm -f core
 clo :
-	mv *.o trash
+	mv *.o trash/. 	2>/dev/null; true
 clt :
-	mv t? trash
+	mv t? trash/. 	2>/dev/null; true
 clsl :
-	mv *.so trash
+	mv *.so trash/. 2>/dev/null; true
 cla :
-	mv *.a trash
+	mv *.a trash/. 	2>/dev/null; true
 
 
 
