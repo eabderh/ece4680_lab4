@@ -12,12 +12,12 @@ typedef struct node {
 	struct node *left;
 	struct node *right;
 	struct node *back;
-} node;
+	} node;
 
 typedef struct code {
 	int length;
 	unsigned char *encoding;
-} code;
+	} code;
 
 
 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 					nullBackCount++;
 					if ( nodeArray[x].freq <= small1Val ) {
 						small2 = small1;
-						if (small2 != NULL) small2Val = small2->freq;					
+						if (small2 != NULL) small2Val = small2->freq;
 						small1 = &nodeArray[x];
 						small1Val = small1->freq;
 						}
@@ -109,11 +109,13 @@ int main(int argc, char *argv[]) {
 				prev = curr;
 				curr = prev->back;
 				codeArray[x].encoding = realloc(codeArray[x].encoding, charCount);
-				if (prev == curr->left ) codeArray[x].encoding[charCount - 1] = 0;
-				else codeArray[x].encoding[charCount - 1] = 1;
+				if (prev == curr->left)
+					codeArray[x].encoding[charCount - 1] = 0;
+				else
+					codeArray[x].encoding[charCount - 1] = 1;
 				codeArray[x].length = charCount;
 				}
-			//reverse the codes
+			// reverse the codes
 			unsigned char codeHold[codeArray[x].length];
 			for (y=0; y < codeArray[x].length; y++) {
 				codeHold[y] = codeArray[x].encoding[y];
