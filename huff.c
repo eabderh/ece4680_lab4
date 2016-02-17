@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Error: File could not be opened\n");
 		exit(-1);
 		}
-	dest_fileptr = fopen(filename_dest, "wb");
+	dest_fileptr = fopen(filename_dest, "w+");
 	if (dest_fileptr == NULL) {
 		fprintf(stderr, "Error: File could not be opened\n");
 		exit(-1);
@@ -225,11 +225,13 @@ int main(int argc, char *argv[]) {
 		fwrite(&extraBits,sizeof(unsigned short),1,dest_fileptr);
 		fwrite(compressed,sizeof(unsigned char),totalBytes,dest_fileptr);
 		// close files and return
-		fclose(dest_fileptr);
-		fclose(source_fileptr);
 		}
 	else if (option == DECOMPRESS) {
 		}
+
+
+	fclose(dest_fileptr);
+	fclose(source_fileptr);
 
 	return 1;
 }
