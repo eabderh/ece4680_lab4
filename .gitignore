@@ -1,0 +1,27 @@
+
+# file itself
+#.gitignore
+
+# c
+*.o
+*.a
+*.so
+
+# vim session
+.*.vs.vim
+
+# swap files
+.*.swp
+
+# network files
+**.nfs*
+
+# additional
+**.ppm
+**.hex
+doc
+testing
+
+# sub git repos
+
+
