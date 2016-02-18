@@ -14,7 +14,7 @@
 #define BYTESIZE 256
 #define BST_PRINT_OFFSET 10
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define test fprintf(stdout, "[TEST %d]\n", __LINE__);
 #define debug(M) fprintf(	stdout, "[DEBUG %d] %s: %x %d\n", \
@@ -26,6 +26,21 @@
 #define debugc(M) fprintf(stdout, "[DEBUG %d] %s: %c %x\n", \
 							__LINE__, #M, M, M); \
 							fflush(stdout);
+#define BYTETOBINARYFPRINT "%d%d%d%d%d%d%d%d"
+#define BYTETOBINARY(byte) \
+	(byte & 0x80 ? 1 : 0), \
+	(byte & 0x40 ? 1 : 0), \
+	(byte & 0x20 ? 1 : 0), \
+	(byte & 0x10 ? 1 : 0), \
+	(byte & 0x08 ? 1 : 0), \
+	(byte & 0x04 ? 1 : 0), \
+	(byte & 0x02 ? 1 : 0), \
+	(byte & 0x01 ? 1 : 0)
+
+#define debugb(M) fprintf(stdout, \
+	"[DEBUG %d] %s: "BYTETOBINARYFPRINT"\n", \
+	__LINE__, #M, BYTETOBINARY(M)); \
+	fflush(stdout);
 #else
 #define test
 #define debug(M)
@@ -36,9 +51,15 @@
 
 
 typedef enum {COMPRESS, DECOMPRESS} Option;
+typedef struct ByteEncodingTag {
+	unsigned char 	decodedbyte;
+	unsigned char 	encodedbyte;
+	int 			length;
+	} ByteEncoding;
 typedef struct BstNodeDataTag {
-	int 	freq;
-	char 	refbyte;
+	unsigned char 	bitvalue;
+	int 			freq;
+	unsigned char 	refbyte;
 	} BstNodeData;
 
 
@@ -48,9 +69,9 @@ void getdata(void* data_ptr, char* buffer)
 BstNodeData data;
 data = *((BstNodeData*) data_ptr);
 if ((data.refbyte != 0) && (isprint(data.refbyte)))
-	sprintf(buffer, "%c %d", data.refbyte, data.freq);
+	sprintf(buffer, "%c %d %d", data.refbyte, data.freq, data.bitvalue);
 else
-	sprintf(buffer, "0x%x %d", data.refbyte, data.freq);
+	sprintf(buffer, "0x%x %d %d", data.refbyte, data.freq, data.bitvalue);
 return;
 }
 
@@ -170,7 +191,11 @@ freq_array = (int*) calloc(BYTESIZE, sizeof(int));
 for (x = 0; x < source_filesize; x++) {
 	byte = fgetc(source_fileptr);
 	debugc(byte)
-	freq_array[(int) byte]++;
+	if (freq_array[byte] == BYTESIZE-1) {
+		fprintf(stderr, "Error: size\n");
+		exit(0);
+		}
+	freq_array[byte]++;
 	}
 
 
@@ -183,13 +208,10 @@ BstNodeData* 	data;
 
 leafnodes = (BstNode*) calloc(BYTESIZE, sizeof(BstNode));
 leafnodes_count = 0;
-for (x = 0; x < BYTESIZE-1; x++) {
+for (x = 0; x < BYTESIZE; x++) {
 
 	// only include the bytes with a good occurence
 	if (freq_array[x] > 0) {
-		// possible coding of leafnodes
-		//BstNode* leafnodes[BYTESIZE];
-		//leafnodes[x] = (BstNode*) malloc(sizeof(BstNode);
 		data = (BstNodeData*) malloc(sizeof(BstNodeData));
 		data->refbyte 	= x;
 		data->freq 		= freq_array[x];
@@ -225,164 +247,195 @@ for (x = 0; x < leafnodes_count; x++) {
 	}
 
 
-int 		index[2];
-int 		smallestvalue[2];
+int 		smallindex_one;
+int 		smallindex_two;
+int 		smallval_one;
+int 		smallval_two;
 int 		currentvalue;
 int 		nodes_count;
+BstNode* 	node_left;
+BstNode* 	node_right;
 BstNode* 	node_combine;
+BstNode* 	root;
+BstTree 	tree;
 
 nodes_count = nodes_size;
-index[0] = 0;
+smallindex_one = 0;
+smallindex_two = 0;
 
 while (nodes_count > 1) {
 	// initialize
-	data = (BstNodeData*) nodes[index[0]]->data;
-	smallestvalue[0] = 0;
-	smallestvalue[1] = 0;
+	data = (BstNodeData*) nodes[smallindex_one]->data;
+	smallval_one = 0;
+	smallval_two = 0;
 	for (x = 0; x < nodes_size; x++) {
 		if (nodes[x] != NULL) {
 			data = (BstNodeData*) nodes[x]->data;
 			currentvalue = data->freq;
 			debug(currentvalue)
-			if (	(smallestvalue[0] > currentvalue) ||
-					(smallestvalue[0] == 0)) {
-				smallestvalue[1] = smallestvalue[0];
-				index[1] = index[0];
-				smallestvalue[0] = currentvalue;
-				index[0] = x;
+			if (	(smallval_one > currentvalue) ||
+					(smallval_one == 0)) {
+				smallval_two = smallval_one;
+				smallindex_two = smallindex_one;
+				smallval_one = currentvalue;
+				smallindex_one = x;
 				}
-			else if (	(smallestvalue[1] > currentvalue) ||
-						(smallestvalue[1] == 0)) {
-				smallestvalue[1] = currentvalue;
-				index[1] = x;
+			else if (	(smallval_two > currentvalue) ||
+						(smallval_two == 0)) {
+				smallval_two = currentvalue;
+				smallindex_two = x;
 				}
 			}
 		}
-	debug(smallestvalue[0])
-	debug(smallestvalue[1])
-	test
+	debug(smallval_one)
+	debug(smallval_two)
+
+	node_left 	= nodes[smallindex_one];
+	node_right 	= nodes[smallindex_two];
+
 	data = (BstNodeData*) malloc(sizeof(BstNodeData));
 	data->refbyte 	= 0;
-	data->freq 		= smallestvalue[0] + smallestvalue[1];
-	debug(data->freq)
+	data->freq 		= smallval_one + smallval_two;
 
 	node_combine = (BstNode*) malloc(sizeof(BstNode));
 	node_combine->parent 	= NULL;
-	node_combine->left 		= nodes[index[0]];
-	node_combine->right 	= nodes[index[1]];
+	node_combine->left 		= node_left;
+	node_combine->right 	= node_right;
 	node_combine->data 		= data;
 
-	nodes[index[0]] = node_combine;
-	nodes[index[1]] = NULL;
-	debug(nodes_count)
+	node_left->parent 	= node_combine;
+	node_right->parent 	= node_combine;
+
+	((BstNodeData*) node_left->data)->bitvalue 	= 0;
+	((BstNodeData*) node_right->data)->bitvalue = 1;
+
+	nodes[smallindex_one] = node_combine;
+	nodes[smallindex_two] = NULL;
 	nodes_count--;
 	}
 
+root = node_combine;
+((BstNodeData*) root->data)->bitvalue = -1;
 
-BstTree tree;
 tree.root = node_combine;
-
 bst_debug_print_tree(&tree, &getdata);
 
 
 
+ByteEncoding* 	encoding_array;
+BstNode* 		node_leaf;
+BstNode* 		node;
+unsigned char 	encodingbyte;
+unsigned char 	encodingbyte_next;
+int 			length;
 
-////Initialize codeArray
-//code codeArray[256];
-//for (x = 0; x < BYTESIZE; x++) {
-//	codeArray[x].encoding = NULL;
-//}
-//
-//// loop through leafnodes[0-255], traversing with the back pointers.
-//// store encoding in codeArray[0-255] (traversing from the leafs to
-//// root leads to backwards code, it is reversed)
-//
-//int charCount,y,y2;
-//node *curr,*prev;
-//for (x = 0; x < BYTESIZE; x++) {
-//	if (leafnodes[x].freq == 0) continue;
-//	curr = &leafnodes[x];
-//	charCount = 0;
-//	while (curr->back != NULL) {
-//		charCount++;
-//		prev = curr;
-//		curr = prev->back;
-//		codeArray[x].encoding = realloc(codeArray[x].encoding, charCount);
-//		if (prev == curr->left)
-//			codeArray[x].encoding[charCount - 1] = 0;
-//		else
-//			codeArray[x].encoding[charCount - 1] = 1;
-//		codeArray[x].length = charCount;
-//		}
-//	// reverse the codes
-//	unsigned char codeHold[codeArray[x].length];
-//	for (y=0; y < codeArray[x].length; y++) {
-//		codeHold[y] = codeArray[x].encoding[y];
-//		}
-//	y2 = 0;
-//	for (y=codeArray[x].length - 1; y >=0; y--) {
-//		codeArray[x].encoding[y2] = codeHold[y];
-//		y2++;
-//		}
-//	}
-//// encodings and their respective lengths are stored in
-//// codeArray[0-255]
-//
-//// begin output to file
-//
-//// first the 256 int array holding the char-frequencies is written to
-//// file can use the same exact methods as above in decompression to
-//// create the code arrays
-//
-//fwrite(freq_array,sizeof(int),BYTESIZE,dest_fileptr);
-//
-//// now rewind the read from file to read through BYTESIZE by BYTESIZE again.
-//// Write the proper encoding of each BYTESIZE
-//
-//rewind(source_fileptr);
-//int breakOut = 0;
-//int count = 0;
-//unsigned char byteOut = 0x00;
-//unsigned char *compressed;
-//int totalBytes = 0;
-//// extra bits is needed to indicate the amount of padding with 0's on
-//// the very last BYTESIZE
-//
-//short extraBits = 0;
-//byte = fgetc(source_fileptr);
-//while (1) {
-//	for (x =0; x < 8; x++) {
-//		if ( count >= codeArray[byte].length) {
-//			byte = fgetc(source_fileptr);
-//			if ( byte == EOF) {
-//				breakOut = 1;
-//				extraBits = 8 - (short)x;
-//				if (extraBits == 8) extraBits = 0;
-//				byteOut = byteOut << (extraBits - 1);
-//				break;
-//				}
-//			count = 0;
-//			}
-//		byteOut = byteOut | codeArray[byte].encoding[count];
-//		if (x != 7) byteOut = byteOut << 1;
-//		count++;
-//		}
-//	totalBytes++;
-//	compressed = realloc(compressed,totalBytes);
-//	compressed[totalBytes-1] = byteOut;
-//
-//	if (breakOut == 1) break;
-//	byteOut = 0x00;
-//	}
-//// write one short after the freq array to the file. this short
-//// indicates the amount of padded 0's on the last BYTESIZE. Range (0-7)
-//
-//fwrite(&extraBits,sizeof(unsigned short),1,dest_fileptr);
-//fwrite(compressed,sizeof(unsigned char),totalBytes,dest_fileptr);
-//// close files and return
-//
+encoding_array = 	(ByteEncoding*)
+					malloc(leafnodes_count * sizeof(ByteEncoding));
+
+for (x = 0; x < leafnodes_count; x++) {
+	node_leaf = &leafnodes[x];
+	node = node_leaf;
+	encodingbyte = 0;
+	length = 0;
+	while (node->parent != NULL) {
+		debug(encodingbyte)
+		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
+		debug(encodingbyte_next)
+		encodingbyte = encodingbyte | (encodingbyte_next << length);
+		length++;
+		node = node->parent;
+		}
+
+	encoding_array[x].decodedbyte = ((BstNodeData*) node_leaf->data)->refbyte;
+	encoding_array[x].encodedbyte = encodingbyte;
+	encoding_array[x].length = length;
+	}
 
 
+//debug
+for (x = 0; x < leafnodes_count; x++) {
+	debugc(encoding_array[x].decodedbyte)
+	debugb(encoding_array[x].encodedbyte)
+	debug(encoding_array[x].length)
+	}
+
+
+
+
+if (leafnodes_count < BYTESIZE/2) {
+	fputc(1, dest_fileptr);
+	fputc(leafnodes_count, dest_fileptr);
+
+	for (x = 0; x < BYTESIZE; x++) {
+		if (freq_array[x] > 0) {
+			fputc(x, dest_fileptr);
+			fputc(freq_array[x], dest_fileptr);
+			}
+		}
+	}
+else {
+	fputc(0, dest_fileptr);
+	fwrite(freq_array, 1, BYTESIZE, dest_fileptr);
+	}
+
+fseek(source_fileptr, 0, SEEK_SET);
+
+
+int 			index;
+unsigned char 	decodedbyte;
+unsigned char 	encodedbyte;
+unsigned char 	bit_buffer;
+int 			bit_width;
+
+bit_width 	= 8;
+bit_buffer 	= 0;
+length 		= 0;
+x 			= 0;
+debug(source_filesize)
+while (1) {
+	debugb(bit_buffer)
+	if (bit_width <= 0) {
+		test
+		debugb(bit_buffer)
+		fputc(bit_buffer, dest_fileptr);
+		bit_buffer = 0;
+		bit_width = 8;
+		}
+	if (length <= 0) {
+		if (x >= source_filesize) {
+			if (bit_width != 8) {
+				bit_buffer = bit_buffer << bit_width;
+				test
+				debugb(bit_buffer)
+				fputc(bit_buffer, dest_fileptr);
+				}
+			debugb(bit_width%8)
+			fputc(bit_width % 8, dest_fileptr);
+			break;
+			}
+		decodedbyte = fgetc(source_fileptr);
+		index = 0;
+		while (encoding_array[index].decodedbyte != decodedbyte) {
+			index++;
+			}
+		encodedbyte = encoding_array[index].encodedbyte;
+		length = encoding_array[index].length;
+		x++;
+		debugb(encodedbyte)
+		}
+
+	debug(bit_width)
+	debug(length)
+	bit_buffer = bit_buffer << 1;
+	bit_buffer |= (encodedbyte >> (length - 1)) & 1;
+
+	bit_width--;
+	length--;
+
+	}
+
+
+return;
 
 }
 
