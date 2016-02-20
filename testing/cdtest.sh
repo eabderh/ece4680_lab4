@@ -1,8 +1,8 @@
 #!/bin/bash
 
 cd testing &> /dev/null
-./lab3 -c $1 zipped.lzw
-./lab3 -d zipped.lzw out
+./huff -c $1 zipped.lzw
+./huff -d zipped.lzw out
 diff -q $1 out
 
 xxd zipped.lzw > zipped.lhex
