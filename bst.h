@@ -1,4 +1,5 @@
 
+#define BST_PRINT_OFFSET 10
 
 typedef struct BstNodeDef {
 	void* 				data;
@@ -25,11 +26,12 @@ typedef void (*GetDataFunc)(void*, char*);
 void bst_freenodes(BstTree* tree);
 void bst_freenodes_rec(BstNode* node);
 void bst_debugprinttree(BstTree* tree, GetDataFunc getdata);
-void bst_debugprint_rec(	BstNode* node,
-							int level,
-							int level_print,
-							int height,
-							GetDataFunc getdata);
+void bst_debugprint_rec(
+		BstNode* node,
+		int level,
+		int level_print,
+		int height,
+		GetDataFunc getdata);
 int bst_height(BstTree* tree);
 int bst_height_rec(BstNode* node, int level);
 

@@ -2,13 +2,20 @@
 #if DEBUG
 #define test fprintf(stdout, "[TEST %d]\n", __LINE__);
 #define debugm(M) fprintf(	stdout, "\n\n[DEBUG %d] %s\n\n", __LINE__, M);
-#define debug(M) fprintf(	stdout, "[DEBUG %d] %s: %x %d\n", \
-							__LINE__, #M, \
-							(unsigned int)M, (unsigned int)M); \
-							fflush(stdout);
-#define debugs(M) fprintf(stdout, "[DEBUG %d] %s: %s\n", __LINE__, #M, M); \
-							fflush(stdout);
-#define debugl(M) fprintf(stdout, "[DEBUG %d] %s: %lld\n", __LINE__, #M, M); \
+#define debug(M) \
+	fprintf(	stdout, \
+				"[DEBUG %d] %s: %x %d\n", \
+				__LINE__, #M, \
+				(unsigned int)M, \
+				(unsigned int)M); \
+	fflush(stdout);
+#define debugs(M) 	fprintf(	stdout, \
+								"[DEBUG %d] %s: %s\n", \
+								__LINE__, \
+								#M, \
+								M); \
+					fflush(stdout);
+#define debugl(M) fprintf(stdout, "[DEBUG %d] %s: %ld\n", __LINE__, #M, M); \
 							fflush(stdout);
 #define debugc(M) fprintf(stdout, "[DEBUG %d] %s: %c %x\n", \
 							__LINE__, #M, M, M); \

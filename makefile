@@ -1,13 +1,13 @@
 # ---- FILE HEADER ----------------------------------------------------------
-# project: lab3
-# file: makefile
-# student/author: elias abderhalden
-# date: 2016-02-11
+# project: 		lab4
+# file: 		makefile
+# author: 		elias abderhalden
+# date: 		2016-02-11
 # ---------------------------------------------------------------------------
-# class: ece4380 spring 2016
-# instructor: Adam Hoover
-# assignment: lab3
-# purpose: lzw compression
+# class: 		ece4680 spring 2016
+# instructor: 	Adam Hoover
+# assignment: 	lab4
+# purpose: 		hoffman compression
 # ---------------------------------------------------------------------------
 # notes:	commands
 # 			make - build programs
@@ -28,8 +28,8 @@ af = -cvq
 an = $(a) $(af)
 
 
-lab3 : huff.o
-	$(c) huff.o -o huff -lm
+lab3 : huff.o huff.h debug.h bst.h
+	$(c) huff.o -o huff
 
 %.o : %.c
 	$(cn) -c -o $@ $<
