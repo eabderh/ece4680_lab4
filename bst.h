@@ -1,8 +1,5 @@
 
 
-
-
-
 typedef struct BstNodeDef {
 	void* 				data;
 	struct BstNodeDef* 	parent;

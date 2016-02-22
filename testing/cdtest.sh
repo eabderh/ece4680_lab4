@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd testing &> /dev/null
+#cd testing &> /dev/null
 ./huff -c $1 zipped.lzw
 ./huff -d zipped.lzw out
 diff -q $1 out
