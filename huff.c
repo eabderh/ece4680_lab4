@@ -9,8 +9,26 @@
 
 #include "bst.h"
 
-typedef unsigned long int uint32_t;
 
+
+
+#if __GNUC__
+#if __x86_64__ || __powerpc64__
+#define ENV_64bit 1
+#else
+#if __i386__ || __powerpc__
+#define ENV_32bit 1
+#endif
+#endif
+#endif
+
+
+
+#if ENV_32bit || ENV_64bit
+typedef unsigned long int huff_uint32;
+#else
+#error system environment not supported
+#endif
 
 #define BYTESIZE 256
 #define BYTEWIDTH 8
@@ -20,50 +38,8 @@ typedef unsigned long int uint32_t;
 #define ENDING_OFFSET 1
 
 
-//#define DEBUG
-#ifdef DEBUG
-#define test fprintf(stdout, "[TEST %d]\n", __LINE__);
-#define debugm(M) fprintf(	stdout, "\n\n[DEBUG %d] %s\n\n", __LINE__, M);
-#define debug(M) fprintf(	stdout, "[DEBUG %d] %s: %x %d\n", \
-							__LINE__, #M, \
-							(unsigned int)M, (unsigned int)M); \
-							fflush(stdout);
-#define debugs(M) fprintf(stdout, "[DEBUG %d] %s: %s\n", __LINE__, #M, M); \
-							fflush(stdout);
-#define debugl(M) fprintf(stdout, "[DEBUG %d] %s: %lld\n", __LINE__, #M, M); \
-							fflush(stdout);
-#define debugc(M) fprintf(stdout, "[DEBUG %d] %s: %c %x\n", \
-							__LINE__, #M, M, M); \
-							fflush(stdout);
-#define debugp(M) fprintf(stdout, "[DEBUG %d] %s: %p\n", \
-							__LINE__, #M, M); \
-							fflush(stdout);
-#define BYTETOBINARYFPRINT "%d%d%d%d%d%d%d%d"
-#define BYTETOBINARY(byte) \
-	(byte & 0x80 ? 1 : 0), \
-	(byte & 0x40 ? 1 : 0), \
-	(byte & 0x20 ? 1 : 0), \
-	(byte & 0x10 ? 1 : 0), \
-	(byte & 0x08 ? 1 : 0), \
-	(byte & 0x04 ? 1 : 0), \
-	(byte & 0x02 ? 1 : 0), \
-	(byte & 0x01 ? 1 : 0)
-#define debugb(M) fprintf(stdout, \
-	"[DEBUG %d] %s: "BYTETOBINARYFPRINT" "BYTETOBINARYFPRINT"\n", \
-	__LINE__, #M, BYTETOBINARY(*(((char*)M)+1)), BYTETOBINARY(*((char*)M))); \
-	fflush(stdout);
-#else
-#define test
-#define debugm(M)
-#define debug(M)
-#define debugs(M)
-#define debugc(M)
-#define debugp(M)
-#define debugb(M)
-#define debugl(M)
-#endif
-
-
+//#define DEBUG 1
+#include "debug.h"
 
 typedef enum {COMPRESS, DECOMPRESS} Option;
 typedef struct ByteEncodingTag {
@@ -94,8 +70,8 @@ return;
 
 void compression(FILE* source_fileptr, FILE* dest_fileptr);
 void decompression(FILE* source_fileptr, FILE* dest_fileptr);
-uint32_t quick_log2(uint32_t i);
-uint32_t getfilesize(FILE* fileptr);
+huff_uint32 quick_log2(huff_uint32 i);
+huff_uint32 getfilesize(FILE* fileptr);
 
 
 
@@ -157,36 +133,172 @@ if (dest_fileptr == NULL) {
 	exit(-1);
 	}
 
-int source_filesize;
-int dest_filesize;
-
+int 	source_filesize;
+int 	dest_filesize;
+float 	ratio;
 
 if (option == COMPRESS) {
 	compression(source_fileptr, dest_fileptr);
 
 	source_filesize = getfilesize(source_fileptr);
 	dest_filesize = getfilesize(dest_fileptr);
+	ratio = dest_filesize/((float) source_filesize);
 
-	fprintf(stdout, "original size: %d (0x%x)\n", 	source_filesize,
-													source_filesize);
-	fprintf(stdout, "new size: %d (0x%x)\n", 	dest_filesize,
-												dest_filesize);
-	fprintf(stdout, "ratio: %f\n", dest_filesize/((float) source_filesize));
+	fprintf( 	stdout,
+				"original size: \t%d (0x%x)\n",
+				source_filesize,
+				source_filesize);
+	fprintf( 	stdout,
+				"new size: \t%d (0x%x)\n",
+				dest_filesize,
+				dest_filesize);
+	fprintf( 	stdout,
+				"ratio: \t\t%f (%.2f%%)\n",
+				ratio,
+				ratio * 100);
 	}
 else if (option == DECOMPRESS) {
 	decompression(source_fileptr, dest_fileptr);
 	}
 
-test
 fclose(dest_fileptr);
 fclose(source_fileptr);
-test
 
 return 1;
 }
 
 
 
+
+/* ----------------------------------------------------------------------
+ * function: 	nodearray_encoding()
+ * description: takes an array of nodes, builds a tree, and fills in the
+ * 				encoding array.
+ * input: 		leafnodes - array of nodes
+ * 				leafnodes_count - size of leafnodes array
+ * output: 		encoding_array_ret - address
+ */
+
+void nodearray_encoding(
+	BstNode** 		leafnodes,
+	int 			leafnodes_count,
+	ByteEncoding** 	encoding_array_ret)
+{
+int 			x;
+int 			smallindex_one;
+int 			smallindex_two;
+long 			smallval_one;
+long 			smallval_two;
+long 			currentvalue;
+int 			nodes_count;
+BstNode** 		nodes;
+BstNode* 		node_left;
+BstNode* 		node_right;
+BstNode* 		node_combine;
+BstNode* 		root;
+BstTree 		tree;
+BstNodeData* 	data_ptr;
+
+
+nodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
+memcpy(nodes, leafnodes, leafnodes_count * sizeof(BstNode*));
+
+nodes_count = leafnodes_count;
+smallindex_one = 0;
+smallindex_two = 0;
+
+while (nodes_count > 1) {
+	// initialize
+	data_ptr = (BstNodeData*) nodes[smallindex_one]->data;
+	smallval_one = 0;
+	smallval_two = 0;
+	for (x = 0; x < leafnodes_count; x++) {
+		if (nodes[x] != NULL) {
+			data_ptr = (BstNodeData*) nodes[x]->data;
+			currentvalue = data_ptr->freq;
+			if ((smallval_one > currentvalue) || (smallval_one == 0)) {
+				smallval_two 	= smallval_one;
+				smallindex_two 	= smallindex_one;
+				smallval_one 	= currentvalue;
+				smallindex_one 	= x;
+				}
+			else if ((smallval_two > currentvalue) || (smallval_two == 0)) {
+				smallval_two 	= currentvalue;
+				smallindex_two 	= x;
+				}
+			}
+		}
+
+	node_left 				= nodes[smallindex_one];
+	node_right 				= nodes[smallindex_two];
+
+	data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
+	data_ptr->refbyte 		= 0;
+	data_ptr->freq 			= smallval_one + smallval_two;
+
+	node_combine = (BstNode*) malloc(sizeof(BstNode));
+	node_combine->parent 	= NULL;
+	node_combine->left 		= node_left;
+	node_combine->right 	= node_right;
+	node_combine->data 		= data_ptr;
+
+	node_left->parent 		= node_combine;
+	node_right->parent 		= node_combine;
+
+	((BstNodeData*) node_left->data)->bitvalue 	= 0;
+	((BstNodeData*) node_right->data)->bitvalue = 1;
+
+	nodes[smallindex_one] 	= node_combine;
+	nodes[smallindex_two] 	= NULL;
+	nodes_count--;
+	}
+
+root = node_combine;
+((BstNodeData*) root->data)->bitvalue = -1;
+tree.root = root;
+
+#if DEBUG
+bst_debugprinttree(&tree, &getdata);
+#endif
+
+
+
+
+// traveling up from leaf node to root
+
+ByteEncoding* 	encoding_array;
+BstNode* 		node_leaf;
+BstNode* 		node;
+int 		 	encodingbyte;
+int 		 	encodingbyte_next;
+int 			length;
+
+encoding_array = 	(ByteEncoding*)
+					malloc(leafnodes_count * sizeof(ByteEncoding));
+
+for (x = 0; x < leafnodes_count; x++) {
+	node_leaf = leafnodes[x];
+	node = node_leaf;
+	encodingbyte = 0;
+	length = 0;
+
+	while (node->parent != NULL) {
+		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
+		encodingbyte = encodingbyte | (encodingbyte_next << length);
+		node = node->parent;
+		length++;
+		}
+	data_ptr = (BstNodeData*) node_leaf->data;
+	encoding_array[x].decodedbyte 	= data_ptr->refbyte;
+	encoding_array[x].encodedbyte 	= encodingbyte;
+	encoding_array[x].length 		= length;
+	}
+
+*encoding_array_ret = encoding_array;
+
+bst_free(&tree);
+free(nodes);
+}
 
 
 
@@ -202,34 +314,33 @@ return 1;
 void compression(FILE* source_fileptr, FILE* dest_fileptr)
 {
 
-uint32_t 		x;
+huff_uint32 	x;
 unsigned char 	byte;
-uint32_t* 		freq_array;
-uint32_t 		source_filesize;
-uint32_t 		freq_entrymaxsize;
+huff_uint32* 	freq_array;
+huff_uint32 	source_filesize;
+huff_uint32 	freq_entrymaxsize;
 int 			leafnodes_count;
 
 source_filesize = getfilesize(source_fileptr);
-freq_array = (uint32_t*) malloc(BYTESIZE * sizeof(uint32_t));
+debug(source_filesize)
+
+
+// initialize freq_array
+freq_array = (huff_uint32*) malloc(BYTESIZE * sizeof(huff_uint32));
 for (x = 0; x < BYTESIZE; x++) {
 	freq_array[x] = 0;
 	}
 
-debug(source_filesize)
 
 freq_entrymaxsize = UCHAR_MAX;
 leafnodes_count = 0;
 
 for (x = 0; x < source_filesize; x++) {
 	byte = fgetc(source_fileptr);
-	//debugc(byte)
-
 	if (freq_array[byte] == 0) {
 		leafnodes_count++;
 		}
-
 	freq_array[byte]++;
-
 	if (freq_array[byte] > freq_entrymaxsize) {
 		debugl(freq_array[byte])
 		debug(byte)
@@ -256,12 +367,15 @@ for (x = 0; x < source_filesize; x++) {
 debugl(freq_entrymaxsize)
 debug(leafnodes_count)
 
+
+
+
+
 // initialize leafnodes
 BstNode** 		leafnodes;
 BstNode* 		node_ptr;
 BstNodeData* 	data_ptr;
 int 			leafnodes_index;
-
 
 leafnodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
 leafnodes_index = 0;
@@ -283,31 +397,24 @@ for (x = 0; x < BYTESIZE; x++) {
 		}
 	}
 
-//debug(freq_entrymaxsize);
 
 
 
-
-int 		tabletype1_size;
-int 		tabletype2_size;
-char* 		freq_ptr;
-uint32_t 	freq_entrybytesize;
+// write freq_array to file
+int 	tabletype1_size;
+int 	tabletype2_size;
+char* 	freq_ptr;
+int 	freq_entrybytesize;
 
 freq_entrybytesize = quick_log2(freq_entrymaxsize + 1) / BYTEWIDTH;
-
 
 tabletype1_size = 	BYTESIZE * freq_entrybytesize +
 					TABLETYPE1_HEADERSIZE;
 tabletype2_size = 	leafnodes_count * freq_entrybytesize +
 					TABLETYPE2_HEADERSIZE;
 
-debugl(freq_entrymaxsize)
-debugl(freq_entrybytesize)
-debug(leafnodes_count)
-debug(tabletype1_size)
-debug(tabletype2_size)
 //debug
-#ifdef DEBUG
+#if DEBUG
 for (x = 0; x < leafnodes_count; x++) {
 	data_ptr = (BstNodeData*) leafnodes[x]->data;
 	debugc(data_ptr->refbyte)
@@ -316,7 +423,6 @@ for (x = 0; x < leafnodes_count; x++) {
 #endif
 
 if (tabletype1_size <= tabletype2_size) {
-	debugm("compression: tabletype1")
 	fputc(freq_entrybytesize, dest_fileptr);
 	for (x = 0; x < BYTESIZE; x++) {
 		freq_ptr = ((char*) &(freq_array[x]));
@@ -324,16 +430,12 @@ if (tabletype1_size <= tabletype2_size) {
 		}
 	}
 else {
-	debugm("compression: tabletype2")
-	debug(-freq_entrybytesize)
 	fputc(-freq_entrybytesize, dest_fileptr);
-	debug(leafnodes_count)
 	fputc(leafnodes_count, dest_fileptr);
 	for (x = 0; x < leafnodes_count; x++) {
 		data_ptr = (BstNodeData*) leafnodes[x]->data;
 		byte = data_ptr->refbyte;
 		fputc(byte, dest_fileptr);
-
 		freq_ptr = ((char*) &(data_ptr->freq));
 			// this works on little endian systems
 		fwrite(freq_ptr, 1, freq_entrybytesize, dest_fileptr);
@@ -342,139 +444,15 @@ else {
 
 
 
-
-
-int 		smallindex_one;
-int 		smallindex_two;
-long 		smallval_one;
-long 		smallval_two;
-long 		currentvalue;
-int 		nodes_count;
-BstNode** 	nodes;
-BstNode* 	node_left;
-BstNode* 	node_right;
-BstNode* 	node_combine;
-BstNode* 	root;
-BstTree 	tree;
-#ifdef DEBUG
-#endif
-
-
-nodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
-memcpy(nodes, leafnodes, leafnodes_count * sizeof(BstNode*));
-//debug
-for (x = 0; x < leafnodes_count; x++) {
-	data_ptr = (BstNodeData*) nodes[x]->data;
-	debugc(data_ptr->refbyte)
-	debug(data_ptr->freq)
-	}
-
-nodes_count = leafnodes_count;
-smallindex_one = 0;
-smallindex_two = 0;
-
-while (nodes_count > 1) {
-	// initialize
-	data_ptr = (BstNodeData*) nodes[smallindex_one]->data;
-	smallval_one = 0;
-	smallval_two = 0;
-	for (x = 0; x < leafnodes_count; x++) {
-		if (nodes[x] != NULL) {
-			data_ptr = (BstNodeData*) nodes[x]->data;
-			currentvalue = data_ptr->freq;
-			debug(currentvalue)
-			if (	(smallval_one > currentvalue) ||
-					(smallval_one == 0)) {
-				smallval_two = smallval_one;
-				smallindex_two = smallindex_one;
-				smallval_one = currentvalue;
-				smallindex_one = x;
-				}
-			else if (	(smallval_two > currentvalue) ||
-						(smallval_two == 0)) {
-				smallval_two = currentvalue;
-				smallindex_two = x;
-				}
-			}
-		}
-	debug(smallval_one)
-	debug(smallval_two)
-
-	node_left 	= nodes[smallindex_one];
-	node_right 	= nodes[smallindex_two];
-
-	data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
-	data_ptr->refbyte 	= 0;
-	data_ptr->freq 		= smallval_one + smallval_two;
-
-	node_combine = (BstNode*) malloc(sizeof(BstNode));
-	node_combine->parent 	= NULL;
-	node_combine->left 		= node_left;
-	node_combine->right 	= node_right;
-	node_combine->data 		= data_ptr;
-
-	node_left->parent 	= node_combine;
-	node_right->parent 	= node_combine;
-
-	((BstNodeData*) node_left->data)->bitvalue 	= 0;
-	((BstNodeData*) node_right->data)->bitvalue = 1;
-
-	nodes[smallindex_one] = node_combine;
-	nodes[smallindex_two] = NULL;
-	nodes_count--;
-	}
-
-root = node_combine;
-((BstNodeData*) root->data)->bitvalue = -1;
-
-tree.root = node_combine;
-#ifdef DEBUG
-bst_debugprinttree(&tree, &getdata);
-#endif
-
-
-
-
-
-
-/* traveling up from leaf node to root
- */
-
-
+// encoding
 ByteEncoding* 	encoding_array;
-BstNode* 		node_leaf;
-BstNode* 		node;
-int 		 	encodingbyte;
-int 		 	encodingbyte_next;
-int 			length;
-
-encoding_array = 	(ByteEncoding*)
-					malloc(leafnodes_count * sizeof(ByteEncoding));
-
-for (x = 0; x < leafnodes_count; x++) {
-	node_leaf = leafnodes[x];
-	node = node_leaf;
-	encodingbyte = 0;
-	length = 0;
-
-	while (node->parent != NULL) {
-		debug(encodingbyte)
-		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
-		debug(encodingbyte_next)
-		encodingbyte = encodingbyte | (encodingbyte_next << length);
-		length++;
-		node = node->parent;
-		}
-
-	encoding_array[x].decodedbyte = ((BstNodeData*) node_leaf->data)->refbyte;
-	encoding_array[x].encodedbyte = encodingbyte;
-	encoding_array[x].length = length;
-	}
+nodearray_encoding(leafnodes, leafnodes_count, &encoding_array);
+free(freq_array);
+free(leafnodes);
 
 
 //debug
-#ifdef DEBUG
-debugm("compression: encoding table")
+#if DEBUG
 for (x = 0; x < leafnodes_count; x++) {
 	debugc(encoding_array[x].decodedbyte)
 	debug(encoding_array[x].encodedbyte)
@@ -486,7 +464,6 @@ for (x = 0; x < leafnodes_count; x++) {
 
 
 
-free(freq_array);
 fseek(source_fileptr, 0, SEEK_SET);
 
 
@@ -495,6 +472,7 @@ unsigned char 	decodedbyte;
 unsigned int 	encodedbyte;
 unsigned char 	bit_buffer;
 int 			bit_width;
+int 			length;
 
 bit_width 	= BYTEWIDTH;
 bit_buffer 	= 0;
@@ -544,8 +522,7 @@ while (1) {
 	}
 
 //exit(0);
-//bst_free(&tree);
-//free(leafnodes);
+free(encoding_array);
 
 return;
 
@@ -629,7 +606,7 @@ else {
 debug(leafnodes_count)
 debug(data_size)
 
-#ifdef DEBUG2
+#if DEBUG2
 for (x = 0; x < BYTESIZE; x++) {
 	debug(x)
 	debug(freq_array[x])
@@ -680,7 +657,7 @@ BstNode* 	node_right;
 BstNode* 	node_combine;
 BstNode* 	root;
 BstTree 	tree;
-#ifdef DEBUG
+#if DEBUG
 #endif
 
 
@@ -752,7 +729,7 @@ root = node_combine;
 ((BstNodeData*) root->data)->bitvalue = -1;
 
 tree.root = node_combine;
-#ifdef DEBUG
+#if DEBUG
 bst_debugprinttree(&tree, &getdata);
 #endif
 
@@ -794,7 +771,7 @@ for (x = 0; x < leafnodes_count; x++) {
 
 
 //debug
-#ifdef DEBUG
+#if DEBUG
 debugm("decompression: encoding table")
 for (x = 0; x < leafnodes_count; x++) {
 	debugc(encoding_array[x].decodedbyte)
@@ -1078,9 +1055,9 @@ else {
  * arguments: 	fileptr - input file
  * notes:
  */
-uint32_t getfilesize(FILE* fileptr)
+huff_uint32 getfilesize(FILE* fileptr)
 {
-uint32_t filesize;
+huff_uint32 filesize;
 fseek(fileptr, 0L, SEEK_END);
 filesize = ftell(fileptr);
 rewind(fileptr);
@@ -1096,9 +1073,9 @@ return filesize;
  * output: 		log 2 integer
  */
 
-uint32_t quick_log2(uint32_t i)
+huff_uint32 quick_log2(huff_uint32 i)
 {
-uint32_t l;
+huff_uint32 l;
 l = 0;
 while (i >>= 1) {
 	l++;
