@@ -3,23 +3,30 @@
 
 
 
-typedef struct BstNodeTag {
+typedef struct BstNodeDef {
 	void* 				data;
-	struct BstNodeTag* 	parent;
-	struct BstNodeTag* 	left;
-	struct BstNodeTag* 	right;
+	struct BstNodeDef* 	parent;
+	struct BstNodeDef* 	left;
+	struct BstNodeDef* 	right;
 	} BstNode;
 
-typedef struct BstTreeTag {
-	BstNode* 	root;
-	int 		tree_size;
+typedef struct BstLeafNodesDef {
+	BstNode** 	array;
+	int 		count;
+	} BstLeafNodes;
+
+typedef struct BstTreeDef {
+	BstNode* 		root;
+	int 			tree_size;
+	BstLeafNodes 	leafnodes;
 	} BstTree;
+
 
 
 typedef void (*GetDataFunc)(void*, char*);
 
-void bst_free(BstTree* tree);
-void bst_free_rec(BstNode* node);
+void bst_freenodes(BstTree* tree);
+void bst_freenodes_rec(BstNode* node);
 void bst_debugprinttree(BstTree* tree, GetDataFunc getdata);
 void bst_debugprint_rec(	BstNode* node,
 							int level,

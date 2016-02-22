@@ -42,14 +42,14 @@ typedef unsigned long int huff_uint32;
 #include "debug.h"
 
 typedef enum {COMPRESS, DECOMPRESS} Option;
-typedef struct ByteEncodingTag {
+typedef struct ByteEncodingDef {
 	unsigned char 	decodedbyte;
-	int 			encodedbyte;
+	huff_uint32 	encodedbyte;
 	int 			length;
 	} ByteEncoding;
-typedef struct BstNodeDataTag {
+typedef struct BstNodeDataDef {
 	unsigned int 	bitvalue;
-	long 			freq;
+	huff_uint32		freq;
 	unsigned char 	refbyte;
 	} BstNodeData;
 
@@ -169,20 +169,59 @@ return 1;
 
 
 
+/* ----------------------------------------------------------------------
+ * function: 	make_leafnodes()
+ * description: makes leaf nodes out of the frequency array.
+ * input: 		freq_array - frequency array
+ * 				leafnodes_count - count of leaf nodes
+ * output: 		leafnodes - address of BstLeafNodes structure to be filled out
+ */
+void make_leafnodes(
+	huff_uint32* freq_array,
+	int leafnodes_count,
+	BstLeafNodes* leafnodes)
+{
+int x;
+BstNode** 		leafnodes_array;
+BstNode* 		node_ptr;
+BstNodeData* 	data_ptr;
+//BstLeafNodes* 	leafnodes;
+int 			leafnodes_index;
+
+leafnodes_array = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
+leafnodes_index = 0;
+for (x = 0; x < BYTESIZE; x++) {
+	// only include the bytes with a good occurence
+	if (freq_array[x] > 0) {
+		data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
+		data_ptr->refbyte 	= x;
+		data_ptr->freq 		= freq_array[x];
+
+		node_ptr = (BstNode*) malloc(sizeof(BstNode));
+		node_ptr->left 		= NULL;
+		node_ptr->right 	= NULL;
+		node_ptr->parent 	= NULL;
+		node_ptr->data 		= data_ptr;
+		leafnodes_array[leafnodes_index] = node_ptr;
+
+		leafnodes_index++;
+		}
+	}
+//leafnodes = (BstLeafNodes*) malloc(sizeof(BstLeafNodes));
+leafnodes->array = leafnodes_array;
+leafnodes->count = leafnodes_count;
+}
+
+
 
 /* ----------------------------------------------------------------------
- * function: 	nodearray_encoding()
- * description: takes an array of nodes, builds a tree, and fills in the
- * 				encoding array.
- * input: 		leafnodes - array of nodes
- * 				leafnodes_count - size of leafnodes array
+ * function: 	make_binarytree()
+ * description: takes an array of nodes and builds a tree.
+ * input: 		leafnodes_array - array of nodes
+ * 				leafnodes_count - size of leafnodes_array array
  * output: 		encoding_array_ret - address
  */
-
-void nodearray_encoding(
-	BstNode** 		leafnodes,
-	int 			leafnodes_count,
-	ByteEncoding** 	encoding_array_ret)
+void make_binarytree(BstTree* tree)
 {
 int 			x;
 int 			smallindex_one;
@@ -195,13 +234,16 @@ BstNode** 		nodes;
 BstNode* 		node_left;
 BstNode* 		node_right;
 BstNode* 		node_combine;
-BstNode* 		root;
-BstTree 		tree;
 BstNodeData* 	data_ptr;
+BstNode** 		leafnodes_array;
+int 			leafnodes_count;
+
+leafnodes_array = tree->leafnodes.array;
+leafnodes_count = tree->leafnodes.count;
 
 
 nodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
-memcpy(nodes, leafnodes, leafnodes_count * sizeof(BstNode*));
+memcpy(nodes, leafnodes_array, leafnodes_count * sizeof(BstNode*));
 
 nodes_count = leafnodes_count;
 smallindex_one = 0;
@@ -253,35 +295,60 @@ while (nodes_count > 1) {
 	nodes_count--;
 	}
 
+BstNode* 		root;
+
 root = node_combine;
 ((BstNodeData*) root->data)->bitvalue = -1;
-tree.root = root;
 
-#if DEBUG
-bst_debugprinttree(&tree, &getdata);
-#endif
+tree->leafnodes.array 	= leafnodes_array;
+tree->leafnodes.count 	= leafnodes_count;
+tree->root = root;
+
+free(nodes);
+}
 
 
 
 
+
+/* ----------------------------------------------------------------------
+ * function: 	nodearray_encoding()
+ * description: takes an array of nodes, builds a tree, and fills in the
+ * 				encoding array.
+ * input: 		leafnodes_array - array of nodes
+ * 				leafnodes_count - size of leafnodes_array array
+ * output: 		encoding_array_ret - address
+ */
+
+void tree_encoding(
+	BstTree* 		tree,
+	ByteEncoding** 	encoding_array_ret)
+{
 // traveling up from leaf node to root
 
-ByteEncoding* 	encoding_array;
-BstNode* 		node_leaf;
-BstNode* 		node;
+int 			x;
 int 		 	encodingbyte;
 int 		 	encodingbyte_next;
 int 			length;
+ByteEncoding* 	encoding_array;
+BstNode* 		node_leaf;
+BstNode* 		node;
+BstNodeData* 	data_ptr;
+
+BstNode** 		leafnodes_array;
+int 			leafnodes_count;
+
+leafnodes_array = tree->leafnodes.array;
+leafnodes_count = tree->leafnodes.count;
 
 encoding_array = 	(ByteEncoding*)
 					malloc(leafnodes_count * sizeof(ByteEncoding));
 
 for (x = 0; x < leafnodes_count; x++) {
-	node_leaf = leafnodes[x];
-	node = node_leaf;
-	encodingbyte = 0;
-	length = 0;
-
+	node_leaf 		= leafnodes_array[x];
+	node 			= node_leaf;
+	encodingbyte 	= 0;
+	length 			= 0;
 	while (node->parent != NULL) {
 		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
 		encodingbyte = encodingbyte | (encodingbyte_next << length);
@@ -296,9 +363,9 @@ for (x = 0; x < leafnodes_count; x++) {
 
 *encoding_array_ret = encoding_array;
 
-bst_free(&tree);
-free(nodes);
 }
+
+
 
 
 
@@ -364,63 +431,31 @@ for (x = 0; x < source_filesize; x++) {
 		}
 	}
 
-debugl(freq_entrymaxsize)
-debug(leafnodes_count)
 
 
-
-
-
-// initialize leafnodes
-BstNode** 		leafnodes;
-BstNode* 		node_ptr;
-BstNodeData* 	data_ptr;
-int 			leafnodes_index;
-
-leafnodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
-leafnodes_index = 0;
-for (x = 0; x < BYTESIZE; x++) {
-	// only include the bytes with a good occurence
-	if (freq_array[x] > 0) {
-		data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
-		data_ptr->refbyte 		= x;
-		data_ptr->freq 			= freq_array[x];
-
-		node_ptr = (BstNode*) malloc(sizeof(BstNode));
-		node_ptr->left 		= NULL;
-		node_ptr->right 	= NULL;
-		node_ptr->parent 	= NULL;
-		node_ptr->data 		= data_ptr;
-		leafnodes[leafnodes_index] = node_ptr;
-
-		leafnodes_index++;
-		}
-	}
+// initialize leafnodes_array
+BstTree 	tree;
+BstNode** 	leafnodes_array;
+make_leafnodes(freq_array, leafnodes_count, &tree.leafnodes);
 
 
 
 
 // write freq_array to file
-int 	tabletype1_size;
-int 	tabletype2_size;
-char* 	freq_ptr;
-int 	freq_entrybytesize;
+int 			tabletype1_size;
+int 			tabletype2_size;
+char* 			freq_ptr;
+int 			freq_entrybytesize;
+BstNodeData* 	data_ptr;
+
+leafnodes_count = tree.leafnodes.count;
+leafnodes_array = tree.leafnodes.array;
 
 freq_entrybytesize = quick_log2(freq_entrymaxsize + 1) / BYTEWIDTH;
-
 tabletype1_size = 	BYTESIZE * freq_entrybytesize +
 					TABLETYPE1_HEADERSIZE;
 tabletype2_size = 	leafnodes_count * freq_entrybytesize +
 					TABLETYPE2_HEADERSIZE;
-
-//debug
-#if DEBUG
-for (x = 0; x < leafnodes_count; x++) {
-	data_ptr = (BstNodeData*) leafnodes[x]->data;
-	debugc(data_ptr->refbyte)
-	debug(data_ptr->freq)
-	}
-#endif
 
 if (tabletype1_size <= tabletype2_size) {
 	fputc(freq_entrybytesize, dest_fileptr);
@@ -433,7 +468,7 @@ else {
 	fputc(-freq_entrybytesize, dest_fileptr);
 	fputc(leafnodes_count, dest_fileptr);
 	for (x = 0; x < leafnodes_count; x++) {
-		data_ptr = (BstNodeData*) leafnodes[x]->data;
+		data_ptr = (BstNodeData*) leafnodes_array[x]->data;
 		byte = data_ptr->refbyte;
 		fputc(byte, dest_fileptr);
 		freq_ptr = ((char*) &(data_ptr->freq));
@@ -442,16 +477,24 @@ else {
 		}
 	}
 
+free(freq_array);
+
 
 
 // encoding
+
 ByteEncoding* 	encoding_array;
-nodearray_encoding(leafnodes, leafnodes_count, &encoding_array);
-free(freq_array);
-free(leafnodes);
 
+make_binarytree(&tree);
+tree_encoding(&tree, &encoding_array);
 
-//debug
+#if DEBUG
+bst_debugprinttree(&tree, &getdata);
+#endif
+
+bst_freenodes(&tree);
+free(tree.leafnodes.array);
+
 #if DEBUG
 for (x = 0; x < leafnodes_count; x++) {
 	debugc(encoding_array[x].decodedbyte)
@@ -467,10 +510,10 @@ for (x = 0; x < leafnodes_count; x++) {
 fseek(source_fileptr, 0, SEEK_SET);
 
 
-int 			index;
 unsigned char 	decodedbyte;
 unsigned int 	encodedbyte;
 unsigned char 	bit_buffer;
+int 			index;
 int 			bit_width;
 int 			length;
 
@@ -511,8 +554,6 @@ while (1) {
 		x++;
 		}
 
-//	debug(bit_width)
-//	debug(length)
 	bit_buffer = bit_buffer << 1;
 	bit_buffer |= (char) (encodedbyte >> (length - 1)) & 1;
 
@@ -521,7 +562,6 @@ while (1) {
 
 	}
 
-//exit(0);
 free(encoding_array);
 
 return;
@@ -548,7 +588,7 @@ void decompression(FILE* source_fileptr, FILE* dest_fileptr)
 
 int 			x;
 char 			type;
-long* 			freq_array;
+huff_uint32* 	freq_array;
 int 			source_filesize;
 int 			data_size;
 int 			leafnodes_count;
@@ -563,7 +603,7 @@ source_filesize = getfilesize(source_fileptr);
 debugm("decompression")
 
 
-freq_array = (long*) malloc(BYTESIZE * sizeof(long));
+freq_array = (huff_uint32*) malloc(BYTESIZE * sizeof(huff_uint32));
 type = fgetc(source_fileptr);
 if (type > 0) {
 	debugm("compression: tabletype1")
@@ -617,158 +657,22 @@ exit(0);
 
 
 
-BstNode** 		leafnodes;
-BstNode* 		node_ptr;
-BstNodeData* 	data_ptr;
-int 			leafnodes_index;
+BstTree tree;
 
-leafnodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
-leafnodes_index = 0;
-for (x = 0; x < BYTESIZE; x++) {
-	// only include the bytes with a good occurence
-	if (freq_array[x] > 0) {
-		data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
-		data_ptr->refbyte 		= x;
-		data_ptr->freq 			= freq_array[x];
-
-		node_ptr = (BstNode*) malloc(sizeof(BstNode));
-		node_ptr->left 		= NULL;
-		node_ptr->right 	= NULL;
-		node_ptr->parent 	= NULL;
-		node_ptr->data 		= data_ptr;
-		leafnodes[leafnodes_index] = node_ptr;
-
-		leafnodes_index++;
-		}
-	}
+make_leafnodes(freq_array, leafnodes_count, &tree.leafnodes);
+free(freq_array);
 
 
 
+// encoding
 
-int 		smallindex_one;
-int 		smallindex_two;
-int 		smallval_one;
-int 		smallval_two;
-int 		currentvalue;
-int 		nodes_count;
-BstNode** 	nodes;
-BstNode* 	node_left;
-BstNode* 	node_right;
-BstNode* 	node_combine;
-BstNode* 	root;
-BstTree 	tree;
-#if DEBUG
-#endif
+make_binarytree(&tree);
+free(tree.leafnodes.array);
 
 
-nodes = (BstNode**) malloc(leafnodes_count * sizeof(BstNode*));
-memcpy(nodes, leafnodes, leafnodes_count * sizeof(BstNode*));
-//debug
-for (x = 0; x < leafnodes_count; x++) {
-	data_ptr = (BstNodeData*) nodes[x]->data;
-	debugc(data_ptr->refbyte)
-	debug(data_ptr->freq)
-	}
-
-nodes_count = leafnodes_count;
-smallindex_one = 0;
-smallindex_two = 0;
-
-while (nodes_count > 1) {
-	// initialize
-	data_ptr = (BstNodeData*) nodes[smallindex_one]->data;
-	smallval_one = 0;
-	smallval_two = 0;
-	for (x = 0; x < leafnodes_count; x++) {
-		if (nodes[x] != NULL) {
-			data_ptr = (BstNodeData*) nodes[x]->data;
-			currentvalue = data_ptr->freq;
-			debug(currentvalue)
-			if (	(smallval_one > currentvalue) ||
-					(smallval_one == 0)) {
-				smallval_two = smallval_one;
-				smallindex_two = smallindex_one;
-				smallval_one = currentvalue;
-				smallindex_one = x;
-				}
-			else if (	(smallval_two > currentvalue) ||
-						(smallval_two == 0)) {
-				smallval_two = currentvalue;
-				smallindex_two = x;
-				}
-			}
-		}
-	debug(smallval_one)
-	debug(smallval_two)
-
-	node_left 	= nodes[smallindex_one];
-	node_right 	= nodes[smallindex_two];
-
-	data_ptr = (BstNodeData*) malloc(sizeof(BstNodeData));
-	data_ptr->refbyte 	= 0;
-	data_ptr->freq 		= smallval_one + smallval_two;
-
-	node_combine = (BstNode*) malloc(sizeof(BstNode));
-	node_combine->parent 	= NULL;
-	node_combine->left 		= node_left;
-	node_combine->right 	= node_right;
-	node_combine->data 		= data_ptr;
-
-	node_left->parent 	= node_combine;
-	node_right->parent 	= node_combine;
-
-	((BstNodeData*) node_left->data)->bitvalue 	= 0;
-	((BstNodeData*) node_right->data)->bitvalue = 1;
-
-	nodes[smallindex_one] = node_combine;
-	nodes[smallindex_two] = NULL;
-	nodes_count--;
-	}
-
-root = node_combine;
-((BstNodeData*) root->data)->bitvalue = -1;
-
-tree.root = node_combine;
 #if DEBUG
 bst_debugprinttree(&tree, &getdata);
 #endif
-
-
-
-
-/* traveling up from leaf node to root
- */
-
-ByteEncoding* 	encoding_array;
-BstNode* 		node_leaf;
-BstNode* 		node;
-int 		 	encodingbyte;
-int 		 	encodingbyte_next;
-int 			length;
-
-encoding_array = 	(ByteEncoding*)
-					malloc(leafnodes_count * sizeof(ByteEncoding));
-
-for (x = 0; x < leafnodes_count; x++) {
-	node_leaf = leafnodes[x];
-	node = node_leaf;
-	encodingbyte = 0;
-	length = 0;
-
-	while (node->parent != NULL) {
-		debug(encodingbyte)
-		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
-		debug(encodingbyte_next)
-		encodingbyte = encodingbyte | (encodingbyte_next << length);
-		length++;
-		node = node->parent;
-		}
-
-	encoding_array[x].decodedbyte = ((BstNodeData*) node_leaf->data)->refbyte;
-	encoding_array[x].encodedbyte = encodingbyte;
-	encoding_array[x].length = length;
-	}
-
 
 //debug
 #if DEBUG
@@ -786,20 +690,20 @@ for (x = 0; x < leafnodes_count; x++) {
 
 unsigned char 	encodedbuffer;
 unsigned char 	decodedbyte;
+unsigned char 	padding;
 int 			bitvalue;
 int 			bit_width;
-unsigned char 	padding;
+BstNode* 		root;
+BstNode* 		node;
 
 
+root 		= tree.root;
 node 		= root;
 x 			= 0;
 bit_width 	= 0;
 padding 	= 0;
 
-debug(data_size)
 while (1) {
-	debug(bit_width)
-	debug(x)
 
 	if (bit_width <= 0)	{
 		if (x >= data_size) {
@@ -818,8 +722,6 @@ while (1) {
 		bit_width = BYTEWIDTH - padding;
 		}
 
-	//debug(bit_width)
-	//debug(bitvalue)
 
 	bitvalue = (encodedbuffer >> (bit_width - 1 + padding)) & 1;
 	bit_width--;
@@ -831,19 +733,17 @@ while (1) {
 
 	decodedbyte = ((BstNodeData*) node->data)->refbyte;
 	if ((node->left == NULL) || (node->right == NULL)) {
-		debugm("character");
-		debugc(decodedbyte)
+//		debugm("character");
+//		debugc(decodedbyte)
 		fputc(decodedbyte, dest_fileptr);
 		node = root;
 		}
 	}
 
-test
 if (node != root)
 	fprintf(stdout, "Error at end of file\n");
 
-//bst_free(&tree);
-//free(leafnodes);
+bst_freenodes(&tree);
 
 return;
 
@@ -860,17 +760,17 @@ return;
 
 
 /* ----------------------------------------------------------------------
- * function: 	bst_free()
+ * function: 	bst_freenodes()
  * description: frees all data and nodes in the tree
  * input: 		tree - pointer to a tree
- * notes: 		depends on the recursive bst_free_rec function
+ * notes: 		depends on the recursive bst_freenodes_rec function
  */
 
-void bst_free(BstTree* tree)
+void bst_freenodes(BstTree* tree)
 {
 if (tree == NULL)
 	return;
-bst_free_rec(tree->root);
+bst_freenodes_rec(tree->root);
 return;
 }
 
@@ -878,24 +778,21 @@ return;
 
 
 /* ----------------------------------------------------------------------
- * function: 	bst_free_rec()
+ * function: 	bst_freenodes_rec()
  * description: frees all data and nodes in subnodes
  * input: 		node - pointer to a node
  * notes:
  */
-void bst_free_rec(BstNode* node)
+void bst_freenodes_rec(BstNode* node)
 {
 //debug(node)
 if (node == NULL)
 	return;
-bst_free_rec(node->left);
-bst_free_rec(node->right);
-test
+bst_freenodes_rec(node->left);
+bst_freenodes_rec(node->right);
 if (node->data != NULL)
 	free(node->data);
-test
 free(node);
-test
 return;
 }
 
