@@ -68,10 +68,6 @@ option_str = 	argv[1];
 filename_src = 	argv[2];
 filename_dest = argv[3];
 
-debugs(option_str)
-debugs(filename_src)
-debugs(filename_dest)
-
 if (strcmp(option_str,"-c") == 0)
 	option = COMPRESS;
 else if (strcmp(option_str,"-d") == 0)
@@ -81,10 +77,8 @@ else
 
 
 /* opening files */
-
 FILE* source_fileptr;
 FILE* dest_fileptr;
-
 
 source_fileptr = fopen(filename_src, "rb");
 if (source_fileptr == NULL) {
@@ -97,6 +91,8 @@ if (dest_fileptr == NULL) {
 	exit(-1);
 	}
 
+
+// run compression
 huff_uint32 	source_filesize;
 huff_uint32 	dest_filesize;
 float 			ratio;
@@ -130,9 +126,6 @@ fclose(source_fileptr);
 
 return 1;
 }
-
-
-
 
 
 
@@ -190,6 +183,7 @@ for (x = 0; x < source_filesize; x++) {
 //			freq_entrymaxsize = ULLONG_MAX;
 		else {
 			fprintf(stderr, "Error: Frequency too big\n");
+			exit(0);
 			}
 		}
 	}
@@ -618,8 +612,8 @@ void tree_encoding(
 // traveling up from leaf node to root
 
 int 			x;
-int 		 	encodingbyte;
-int 		 	encodingbyte_next;
+int 		 	bitarray;
+int 		 	bitarray_next;
 int 			length;
 ByteEncoding* 	encoding_array;
 BstNode* 		node_leaf;
@@ -636,25 +630,24 @@ encoding_array = 	(ByteEncoding*)
 					malloc(leafnodes_count * sizeof(ByteEncoding));
 
 for (x = 0; x < leafnodes_count; x++) {
-	node_leaf 		= leafnodes_array[x];
-	node 			= node_leaf;
-	encodingbyte 	= 0;
-	length 			= 0;
+	node_leaf 	= leafnodes_array[x];
+	node 		= node_leaf;
+	bitarray 	= 0;
+	length 		= 0;
 	while (node->parent != NULL) {
-		encodingbyte_next = ((BstNodeData*) node->data)->bitvalue;
-		encodingbyte = encodingbyte | (encodingbyte_next << length);
+		bitarray_next = ((BstNodeData*) node->data)->bitvalue;
+		bitarray = bitarray | (bitarray_next << length);
 		node = node->parent;
 		length++;
 		}
 	data_ptr = (BstNodeData*) node_leaf->data;
-	encoding_array[x].decoded_byte 	= data_ptr->refbyte;
-	encoding_array[x].encoded_bitarray 	= encodingbyte;
-	encoding_array[x].length 		= length;
+	encoding_array[x].decoded_byte 		= data_ptr->refbyte;
+	encoding_array[x].encoded_bitarray 	= bitarray;
+	encoding_array[x].length 			= length;
 	}
 
 *encoding_array_ret = encoding_array;
 }
-
 
 
 
@@ -694,8 +687,6 @@ if (node->data != NULL)
 free(node);
 return;
 }
-
-
 
 
 
@@ -796,6 +787,7 @@ return;
 
 
 
+
 /* ----------------------------------------------------------------------
  * function: 	bst_height
  * description: finds the height of the tree, as in the level of the lowest
@@ -806,7 +798,6 @@ int bst_height(BstTree* tree)
 {
 return bst_height_rec(tree->root, 0);
 }
-
 
 
 
