@@ -13,6 +13,7 @@
 
 
 
+
 compilation:
 
 	gcc -Wall -g huff.c -o huff
@@ -29,6 +30,7 @@ usage:
 		file to be compressed/decompressed
 	file_ouptut:
 		name of output file
+
 
 compression format:
 
