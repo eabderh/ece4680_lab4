@@ -1,8 +1,8 @@
 /* ---- FILE HEADER -----------------------------------------------------
  * project: 	lab4
  * file: 		huff.c
- * author: 		elias abderhalden
- * date: 		2016-02-25
+ * author: 		Elias Abderhalden / Tyler Fitzgerald
+ * date: 		2016-02-22
  * ----------------------------------------------------------------------
  * class: 		ece4680 spring 2016
  * instructor: 	Adam Hoover
@@ -23,7 +23,7 @@
 
 
 //#define DEBUG 1
-#include "debug.h"
+//#include "debug.h"
 
 
 
@@ -165,19 +165,14 @@ for (x = 0; x < source_filesize; x++) {
 		}
 	freq_array[byte]++;
 	if (freq_array[byte] > freq_entrymaxsize) {
-		debugl(freq_array[byte])
-		debug(byte)
 		if (freq_array[byte] < USHRT_MAX) {
 			freq_entrymaxsize = USHRT_MAX;
-			test
 			}
 		else if (freq_array[byte] < UINT_MAX) {
 			freq_entrymaxsize = UINT_MAX;
-			test
 			}
 		else if (freq_array[byte] < ULONG_MAX) {
 			freq_entrymaxsize = ULONG_MAX;
-			test
 			}
 //		else if (freq_array[byte] < ULLONG_MAX)
 //			freq_entrymaxsize = ULLONG_MAX;

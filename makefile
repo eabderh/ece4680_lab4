@@ -1,8 +1,8 @@
 # ---- FILE HEADER ----------------------------------------------------------
 # project: 		lab4
 # file: 		makefile
-# author: 		elias abderhalden
-# date: 		2016-02-11
+# author: 		Elias Abderhalden / Tyler Fitzgerald
+# date: 		2016-02-22
 # ---------------------------------------------------------------------------
 # class: 		ece4680 spring 2016
 # instructor: 	Adam Hoover
