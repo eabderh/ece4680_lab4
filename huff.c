@@ -647,6 +647,48 @@ for (x = 0; x < leafnodes_count; x++) {
 
 
 
+/* ----------------------------------------------------------------------
+ * function: 	getfilesize()
+ * description: returns the number of bytes in a file
+ * arguments: 	fileptr - input file
+ */
+huff_uint32 getfilesize(FILE* fileptr)
+{
+huff_uint32 filesize;
+fseek(fileptr, 0L, SEEK_END);
+filesize = ftell(fileptr);
+rewind(fileptr);
+return filesize;
+}
+
+
+
+/* ----------------------------------------------------------------------
+ * function: 	quick_log2()
+ * description: quick base 2 log
+ * input: 		i - int to be converted
+ * output: 		log 2 integer
+ */
+
+huff_uint32 quick_log2(huff_uint32 i)
+{
+huff_uint32 l;
+l = 0;
+while (i >>= 1) {
+	l++;
+	}
+return l;
+}
+
+
+
+
+/* added from bst.c file
+ * added to reduce number of files and simplify compiling process
+ */
+
+
+
 
 /* ----------------------------------------------------------------------
  * function: 	bst_freenodes()
@@ -827,42 +869,3 @@ else {
 	return a;
 	}
 }
-
-
-
-
-
-/* ----------------------------------------------------------------------
- * function: 	getfilesize()
- * description: returns the number of bytes in a file
- * arguments: 	fileptr - input file
- */
-huff_uint32 getfilesize(FILE* fileptr)
-{
-huff_uint32 filesize;
-fseek(fileptr, 0L, SEEK_END);
-filesize = ftell(fileptr);
-rewind(fileptr);
-return filesize;
-}
-
-
-
-/* ----------------------------------------------------------------------
- * function: 	quick_log2()
- * description: quick base 2 log
- * input: 		i - int to be converted
- * output: 		log 2 integer
- */
-
-huff_uint32 quick_log2(huff_uint32 i)
-{
-huff_uint32 l;
-l = 0;
-while (i >>= 1) {
-	l++;
-	}
-return l;
-}
-
-
