@@ -28,7 +28,7 @@ af = -cvq
 an = $(a) $(af)
 
 
-lab3 : huff.o huff.h debug.h bst.h
+lab4 : huff.o huff.h
 	$(c) huff.o -o huff
 
 %.o : %.c
