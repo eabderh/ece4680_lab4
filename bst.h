@@ -1,3 +1,16 @@
+/* ---- FILE HEADER -----------------------------------------------------
+ * project: 	lab4
+ * file: 		bst.h
+ * author: 		Elias Abderhalden / Tyler Fitzgerald
+ * date: 		2016-02-22
+ * ----------------------------------------------------------------------
+ * class: 		ece4680 spring 2016
+ * instructor: 	Adam Hoover
+ * assignment: 	lab4
+ * purpose: 	hoffman compression
+ * ----------------------------------------------------------------------
+ */
+
 
 #define BST_PRINT_OFFSET 10
 
